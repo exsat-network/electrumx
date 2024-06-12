@@ -18,6 +18,8 @@ from os import environ
 
 from aiorpcx import timeout_after, connect_rs
 import electrumx.lib.text as text
+from dotenv import load_dotenv
+load_dotenv()
 
 
 simple_commands = {
@@ -90,6 +92,18 @@ other_commands = {
             'help': 'e.g. "_asyncio.Task"',
         },
     ),
+    'allutxos':(
+        'Return all utxos pageable',
+        ['--limit'], {
+            'type': int,
+            'default': 50,
+            'help': 'max number of types to return',
+        }, ['startkey'], {
+            'nargs': '?',
+            'type': str,
+            'help': 'last return key',
+        },
+    )
 }
 
 

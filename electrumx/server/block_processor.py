@@ -42,6 +42,7 @@ class Prefetcher:
             blocks_event: asyncio.Event,
             *,
             polling_delay_secs,
+            end_block,
     ):
         self.logger = class_logger(__name__, self.__class__.__name__)
         self.daemon = daemon
@@ -60,6 +61,7 @@ class Prefetcher:
         # This makes the first fetch be 10 blocks
         self.ave_size = self.min_cache_size // 10
         self.polling_delay = polling_delay_secs
+        self.end_block = end_block
 
     async def main_loop(self, bp_height):
         '''Loop forever polling for more blocks.'''
@@ -114,6 +116,11 @@ class Prefetcher:
 
         Repeats until the queue is full or caught up.
         '''
+        if 0 < self.end_block <= self.fetched_height:
+            self.logger.info(f'Arrive at the end block, stop synchronization '
+                             f'end_block: {self.end_block} '
+                             f'fetched_height: {self.fetched_height}')
+            return
         daemon = self.daemon
         daemon_height = await daemon.height()
         async with self.semaphore:
@@ -181,6 +188,7 @@ class BlockProcessor:
         self.prefetcher = Prefetcher(
             daemon, env.coin, self.blocks_event,
             polling_delay_secs=env.daemon_poll_interval_blocks_msec/1000,
+            end_block=self.env.end_block
         )
         self.logger = class_logger(__name__, self.__class__.__name__)
 
@@ -659,6 +667,14 @@ class BlockProcessor:
     async def _process_prefetched_blocks(self):
         '''Loop forever processing blocks as they arrive.'''
         while True:
+            # add by exsat, stop fetch blocks
+            if 0 < self.env.end_block <= self.height:
+                self.logger.info(f'Arrive at the end block, stop synchronization '
+                                 f'end_block: {self.env.end_block} '
+                                 f'current_block: {self.height}')
+                self._caught_up_event.set()
+                break
+
             if self.height == self.daemon.cached_height():
                 if not self._caught_up_event.is_set():
                     await self._first_caught_up()
