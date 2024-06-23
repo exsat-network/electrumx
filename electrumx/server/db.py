@@ -8,7 +8,6 @@
 
 '''Interface to the blockchain database.'''
 
-
 from array import array
 import ast
 import os
@@ -38,11 +37,11 @@ if TYPE_CHECKING:
 @dataclass(order=True)
 class UTXO:
     __slots__ = 'tx_num', 'tx_pos', 'tx_hash', 'height', 'value'
-    tx_num: int      # index of tx in chain order
-    tx_pos: int      # tx output idx
-    tx_hash: bytes   # txid
-    height: int      # block height
-    value: int       # in satoshis
+    tx_num: int  # index of tx in chain order
+    tx_pos: int  # tx output idx
+    tx_hash: bytes  # txid
+    height: int  # block height
+    value: int  # in satoshis
 
 
 @attr.s(slots=True)
@@ -333,7 +332,7 @@ class DB:
             # key: txid+out_idx, value: hashX+tx_num+value_sats
             hashX = value[:HASHX_LEN]
             txout_idx = key[-4:]
-            tx_num = value[HASHX_LEN: HASHX_LEN+TXNUM_LEN]
+            tx_num = value[HASHX_LEN: HASHX_LEN + TXNUM_LEN]
             value_sats = value[-8:]
             suffix = txout_idx + tx_num
             batch_put(b'h' + key[:COMP_TXID_LEN] + suffix, hashX)
@@ -407,8 +406,8 @@ class DB:
         return offset
 
     def dynamic_header_len(self, height):
-        return self.dynamic_header_offset(height + 1)\
-               - self.dynamic_header_offset(height)
+        return self.dynamic_header_offset(height + 1) \
+            - self.dynamic_header_offset(height)
 
     def backup_fs(self, height, tx_count):
         '''Back up during a reorg.  This just updates our pointers.'''
@@ -473,7 +472,7 @@ class DB:
         num_txs_in_block = self.tx_counts[block_height] - first_tx_num
         tx_hashes = self.hashes_file.read(first_tx_num * 32, num_txs_in_block * 32)
         assert num_txs_in_block == len(tx_hashes) // 32
-        return [tx_hashes[idx * 32: (idx+1) * 32] for idx in range(num_txs_in_block)]
+        return [tx_hashes[idx * 32: (idx + 1) * 32] for idx in range(num_txs_in_block)]
 
     async def tx_hashes_at_blockheight(self, block_height):
         return await run_in_thread(self.fs_tx_hashes_at_blockheight, block_height)
@@ -499,6 +498,7 @@ class DB:
         transactions.  By default returns at most 1000 entries.  Set
         limit to None to get them all.
         '''
+
         def read_history():
             tx_nums = list(self.history.get_txnums(hashX, limit))
             fs_tx_hash = self.fs_tx_hash
@@ -749,15 +749,16 @@ class DB:
 
     async def all_utxos(self, hashX):
         '''Return all UTXOs for an address sorted in no particular order.'''
+
         def read_utxos():
             utxos = []
             utxos_append = utxos.append
-            txnum_padding = bytes(8-TXNUM_LEN)
+            txnum_padding = bytes(8 - TXNUM_LEN)
             # Key: b'u' + address_hashX + txout_idx + tx_num
             # Value: the UTXO value as a 64-bit unsigned integer
             prefix = b'u' + hashX
             for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
-                txout_idx, = unpack_le_uint32(db_key[-TXNUM_LEN-4:-TXNUM_LEN])
+                txout_idx, = unpack_le_uint32(db_key[-TXNUM_LEN - 4:-TXNUM_LEN])
                 tx_num, = unpack_le_uint64(db_key[-TXNUM_LEN:] + txnum_padding)
                 value, = unpack_le_uint64(db_value)
                 tx_hash, height = self.fs_tx_hash(tx_num)
@@ -785,8 +786,8 @@ class DB:
             utxos = []
             utxos_append = utxos.append
             txnum_padding = bytes(8 - TXNUM_LEN)
-            iterator = self.utxo_db.iterator(start=bytes.fromhex(lastkey)) if lastkey \
-                else self.utxo_db.iterator()
+            iterator = self.utxo_db.iterator(prefix=b'u', start=bytes.fromhex(lastkey)) if lastkey \
+                else self.utxo_db.iterator(prefix=b'u')
 
             last_db_key = None
             for db_key, db_value in iterator:
@@ -800,7 +801,7 @@ class DB:
                     if len(utxos) == limit:
                         break
                 except Exception as e:
-                    str(e)
+                    print(e)
             return last_db_key, utxos
 
         while True:
@@ -817,13 +818,15 @@ class DB:
 
         Used by the mempool code.
         '''
+
         def lookup_hashXs():
             '''Return (hashX, suffix) pairs, or None if not found,
             for each prevout.
             '''
+
             def lookup_hashX(tx_hash, tx_idx):
                 idx_packed = pack_le_uint32(tx_idx)
-                txnum_padding = bytes(8-TXNUM_LEN)
+                txnum_padding = bytes(8 - TXNUM_LEN)
 
                 # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
                 # Value: hashX
@@ -837,6 +840,7 @@ class DB:
                     if hash == tx_hash:
                         return hashX, idx_packed + tx_num_packed
                 return None, None
+
             return [lookup_hashX(*prevout) for prevout in prevouts]
 
         def lookup_utxos(hashX_pairs):
@@ -856,6 +860,7 @@ class DB:
                     return None
                 value, = unpack_le_uint64(db_value)
                 return hashX, value
+
             return [lookup_utxo(*hashX_pair) for hashX_pair in hashX_pairs]
 
         hashX_pairs = await run_in_thread(lookup_hashXs)
