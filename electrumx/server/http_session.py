@@ -33,9 +33,15 @@ class HttpHandler(object):
         for utxo in utxos:
             txid = hash_to_hex_str(utxo.tx_hash)
             output = "%s:%d" % (txid, utxo.tx_pos)
-            address = output_addr[output]['address']
+
+            if 'address' in output_addr[output]:
+                address = output_addr[output]['address']
+            else:
+                address = 'nostandard'
+            hex = output_addr[output]['hex']
             data = {'height': utxo.height,
                     'address': address,
+                    'scriptPubKeyHex': hex,
                     'txid': txid,
                     'vout': utxo.tx_pos,
                     'value': utxo.value}
