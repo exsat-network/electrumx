@@ -478,8 +478,9 @@ class BlockProcessor:
                 # Get the hashX
                 hashX = script_hashX(txout.pk_script)
                 append_hashX(hashX)
+                # Add txout.pk_script by exsat
                 put_utxo(tx_hash + to_le_uint32(idx),
-                         hashX + tx_numb + to_le_uint64(txout.value))
+                         hashX + tx_numb + to_le_uint64(txout.value) + txout.pk_script)
 
             append_hashXs(hashXs)
             update_touched(hashXs)

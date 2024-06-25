@@ -436,5 +436,5 @@ class MemPool:
             tx = self.txs.get(tx_hash)
             for pos, (hX, value) in enumerate(tx.out_pairs):
                 if hX == hashX:
-                    utxos.append(UTXO(-1, pos, tx_hash, 0, value))
+                    utxos.append(UTXO(-1, pos, tx_hash, 0, value, bytes()))
         return utxos

@@ -36,12 +36,14 @@ if TYPE_CHECKING:
 
 @dataclass(order=True)
 class UTXO:
-    __slots__ = 'tx_num', 'tx_pos', 'tx_hash', 'height', 'value'
+    __slots__ = 'tx_num', 'tx_pos', 'tx_hash', 'height', 'value', 'pk_script'
     tx_num: int  # index of tx in chain order
     tx_pos: int  # tx output idx
     tx_hash: bytes  # txid
     height: int  # block height
     value: int  # in satoshis
+    pk_script: bytes  # publickey script (Add by exsat)
+
 
 
 @attr.s(slots=True)
@@ -329,14 +331,17 @@ class DB:
         # New UTXOs
         batch_put = batch.put
         for key, value in flush_data.adds.items():
-            # key: txid+out_idx, value: hashX+tx_num+value_sats
+            # key: txid+out_idx, value: hashX+tx_num+value_sats+pk_script
             hashX = value[:HASHX_LEN]
             txout_idx = key[-4:]
             tx_num = value[HASHX_LEN: HASHX_LEN + TXNUM_LEN]
-            value_sats = value[-8:]
+            VALUE_LEN = 8
+            value_sats = value[HASHX_LEN + TXNUM_LEN: HASHX_LEN + TXNUM_LEN + VALUE_LEN]
+            pk_script = value[HASHX_LEN + TXNUM_LEN + VALUE_LEN:]
             suffix = txout_idx + tx_num
             batch_put(b'h' + key[:COMP_TXID_LEN] + suffix, hashX)
-            batch_put(b'u' + hashX + suffix, value_sats)
+            batch_put(b'u' + hashX + suffix, value_sats + pk_script)
+
         flush_data.adds.clear()
 
         # New undo information
@@ -754,15 +759,16 @@ class DB:
             utxos = []
             utxos_append = utxos.append
             txnum_padding = bytes(8 - TXNUM_LEN)
-            # Key: b'u' + address_hashX + txout_idx + tx_num
+            # Key: b'u' + address_hashX + txout_idx + tx_num + pk_script
             # Value: the UTXO value as a 64-bit unsigned integer
             prefix = b'u' + hashX
             for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
                 txout_idx, = unpack_le_uint32(db_key[-TXNUM_LEN - 4:-TXNUM_LEN])
                 tx_num, = unpack_le_uint64(db_key[-TXNUM_LEN:] + txnum_padding)
-                value, = unpack_le_uint64(db_value)
+                value, = unpack_le_uint64(db_value[:8])
                 tx_hash, height = self.fs_tx_hash(tx_num)
-                utxos_append(UTXO(tx_num, txout_idx, tx_hash, height, value))
+                pk_script = db_value[8:]
+                utxos_append(UTXO(tx_num, txout_idx, tx_hash, height, value,pk_script))
             return utxos
 
         while True:
@@ -794,9 +800,10 @@ class DB:
                 try:
                     txout_idx, = unpack_le_uint32(db_key[-TXNUM_LEN - 4:-TXNUM_LEN])
                     tx_num, = unpack_le_uint64(db_key[-TXNUM_LEN:] + txnum_padding)
-                    value, = unpack_le_uint64(db_value)
+                    value, = unpack_le_uint64(db_value[:8])
                     tx_hash, height = self.fs_tx_hash(tx_num)
-                    utxos_append(UTXO(tx_num, txout_idx, tx_hash, height, value))
+                    pk_script = db_value[8:]
+                    utxos_append(UTXO(tx_num, txout_idx, tx_hash, height, value,pk_script))
                     last_db_key = db_key.hex()
                     if len(utxos) == limit:
                         break
