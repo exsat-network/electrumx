@@ -39,6 +39,7 @@ def all_subclasses(cls) -> Set:
         res |= all_subclasses(sub)
     return res
 
+
 def read_json(filename, default):
     path = os.path.join(os.path.dirname(__file__), filename)
     try:
@@ -55,7 +56,6 @@ BIP39_WALLET_FORMATS = read_json('bip39_wallet_formats.json', [])
 
 
 class AbstractNet:
-
     NET_NAME: str
     TESTNET: bool
     WIF_PREFIX: int
@@ -86,7 +86,6 @@ class AbstractNet:
 
 
 class BitcoinMainnet(AbstractNet):
-
     NET_NAME = "mainnet"
     TESTNET = False
     WIF_PREFIX = 0x80
@@ -101,19 +100,19 @@ class BitcoinMainnet(AbstractNet):
     BLOCK_HEIGHT_FIRST_LIGHTNING_CHANNELS = 497000
 
     XPRV_HEADERS = {
-        'standard':    0x0488ade4,  # xprv
+        'standard': 0x0488ade4,  # xprv
         'p2wpkh-p2sh': 0x049d7878,  # yprv
-        'p2wsh-p2sh':  0x0295b005,  # Yprv
-        'p2wpkh':      0x04b2430c,  # zprv
-        'p2wsh':       0x02aa7a99,  # Zprv
+        'p2wsh-p2sh': 0x0295b005,  # Yprv
+        'p2wpkh': 0x04b2430c,  # zprv
+        'p2wsh': 0x02aa7a99,  # Zprv
     }
     XPRV_HEADERS_INV = inv_dict(XPRV_HEADERS)
     XPUB_HEADERS = {
-        'standard':    0x0488b21e,  # xpub
+        'standard': 0x0488b21e,  # xpub
         'p2wpkh-p2sh': 0x049d7cb2,  # ypub
-        'p2wsh-p2sh':  0x0295b43f,  # Ypub
-        'p2wpkh':      0x04b24746,  # zpub
-        'p2wsh':       0x02aa7ed3,  # Zpub
+        'p2wsh-p2sh': 0x0295b43f,  # Ypub
+        'p2wpkh': 0x04b24746,  # zpub
+        'p2wsh': 0x02aa7ed3,  # Zpub
     }
     XPUB_HEADERS_INV = inv_dict(XPUB_HEADERS)
     BIP44_COIN_TYPE = 0
@@ -126,7 +125,6 @@ class BitcoinMainnet(AbstractNet):
 
 
 class BitcoinTestnet(AbstractNet):
-
     NET_NAME = "testnet"
     TESTNET = True
     WIF_PREFIX = 0xef
@@ -140,31 +138,30 @@ class BitcoinTestnet(AbstractNet):
     CHECKPOINTS = read_json('checkpoints_testnet.json', [])
 
     XPRV_HEADERS = {
-        'standard':    0x04358394,  # tprv
+        'standard': 0x04358394,  # tprv
         'p2wpkh-p2sh': 0x044a4e28,  # uprv
-        'p2wsh-p2sh':  0x024285b5,  # Uprv
-        'p2wpkh':      0x045f18bc,  # vprv
-        'p2wsh':       0x02575048,  # Vprv
+        'p2wsh-p2sh': 0x024285b5,  # Uprv
+        'p2wpkh': 0x045f18bc,  # vprv
+        'p2wsh': 0x02575048,  # Vprv
     }
     XPRV_HEADERS_INV = inv_dict(XPRV_HEADERS)
     XPUB_HEADERS = {
-        'standard':    0x043587cf,  # tpub
+        'standard': 0x043587cf,  # tpub
         'p2wpkh-p2sh': 0x044a5262,  # upub
-        'p2wsh-p2sh':  0x024289ef,  # Upub
-        'p2wpkh':      0x045f1cf6,  # vpub
-        'p2wsh':       0x02575483,  # Vpub
+        'p2wsh-p2sh': 0x024289ef,  # Upub
+        'p2wpkh': 0x045f1cf6,  # vpub
+        'p2wsh': 0x02575483,  # Vpub
     }
     XPUB_HEADERS_INV = inv_dict(XPUB_HEADERS)
     BIP44_COIN_TYPE = 1
     LN_REALM_BYTE = 1
     LN_DNS_SEEDS = [  # TODO investigate this again
-        #'test.nodes.lightning.directory.',  # times out.
-        #'lseed.bitcoinstats.com.',  # ignores REALM byte and returns mainnet peers...
+        # 'test.nodes.lightning.directory.',  # times out.
+        # 'lseed.bitcoinstats.com.',  # ignores REALM byte and returns mainnet peers...
     ]
 
 
 class BitcoinRegtest(BitcoinTestnet):
-
     NET_NAME = "regtest"
     SEGWIT_HRP = "bcrt"
     BOLT11_HRP = SEGWIT_HRP
@@ -175,7 +172,6 @@ class BitcoinRegtest(BitcoinTestnet):
 
 
 class BitcoinSimnet(BitcoinTestnet):
-
     NET_NAME = "simnet"
     WIF_PREFIX = 0x64
     ADDRTYPE_P2PKH = 0x3f
@@ -189,7 +185,6 @@ class BitcoinSimnet(BitcoinTestnet):
 
 
 class BitcoinSignet(BitcoinTestnet):
-
     NET_NAME = "signet"
     BOLT11_HRP = "tbs"
     GENESIS = "00000008819873e925422c1ff0f99f7cc9bbb232af63a077a480a3633bee1ef6"
@@ -203,22 +198,40 @@ NETS_LIST = tuple(all_subclasses(AbstractNet))
 # don't import net directly, import the module instead (so that net is singleton)
 net = BitcoinMainnet  # type: Type[AbstractNet]
 
+
 def set_signet():
     global net
     net = BitcoinSignet
+
 
 def set_simnet():
     global net
     net = BitcoinSimnet
 
+
 def set_mainnet():
     global net
     net = BitcoinMainnet
+
 
 def set_testnet():
     global net
     net = BitcoinTestnet
 
+
 def set_regtest():
     global net
     net = BitcoinRegtest
+
+
+def set_network(net):
+    if net == BitcoinSignet.NET_NAME:
+        set_signet()
+    elif net == BitcoinSimnet.NET_NAME:
+        set_simnet()
+    elif net == BitcoinMainnet.NET_NAME:
+        set_mainnet()
+    elif net == BitcoinTestnet.NET_NAME:
+        set_testnet()
+    elif net == BitcoinRegtest.NET_NAME:
+        set_regtest()
