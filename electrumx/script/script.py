@@ -2,8 +2,8 @@ import struct
 from enum import IntEnum
 from typing import Optional, Callable, Union, Tuple, Sequence
 
-import constants
-import segwit_addr
+from . import constants
+from . import segwit_addr
 from crypto import sha256d, to_bytes, hash_160, sha256
 
 
@@ -392,11 +392,6 @@ def public_key_to_p2wpkh(public_key: bytes, *, net=None) -> str:
 
 def script_to_p2wsh(script: bytes, *, net=None) -> str:
     return hash_to_segwit_addr(sha256(script), witver=0, net=net)
-
-def pubkey_to_address(txin_type: str, pubkey: str, *, net=None) -> str:
-    from . import descriptor
-    desc = descriptor.get_singlesig_descriptor_from_legacy_leaf(pubkey=pubkey, script_type=txin_type)
-    return desc.expand().address(net=net)
 
 
 def get_address_from_output_script(_bytes: bytes, *, net=None) -> Optional[str]:
