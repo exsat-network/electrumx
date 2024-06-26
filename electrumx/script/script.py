@@ -4,7 +4,7 @@ from typing import Optional, Callable, Union, Tuple, Sequence
 
 from . import constants
 from . import segwit_addr
-from crypto import sha256d, to_bytes, hash_160, sha256
+from .crypto import sha256d, to_bytes, hash_160, sha256
 
 
 class MalformedBitcoinScript(Exception):
