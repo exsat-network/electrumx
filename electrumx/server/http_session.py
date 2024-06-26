@@ -3,6 +3,7 @@
 from aiohttp import web
 import electrumx.lib.util as util
 from electrumx.lib.hash import hash_to_hex_str, Base58
+from electrumx.script.script import get_address_from_output_script
 
 
 class HttpHandler(object):
@@ -24,11 +25,11 @@ class HttpHandler(object):
         for utxo in utxos:
             txid = hash_to_hex_str(utxo.tx_hash)
             scriptPubKeyHex = utxo.pk_script.hex()
-            bitcoin_address = Base58.encode_check(utxo.pk_script)
+            bitcoin_address = get_address_from_output_script(utxo.pk_script)
 
             data = {'height': utxo.height,
                     'address': bitcoin_address,
-                    'scriptPubKeyHex': scriptPubKeyHex,
+                    'script_pub_Key': scriptPubKeyHex,
                     'txid': txid,
                     'vout': utxo.tx_pos,
                     'value': utxo.value}
