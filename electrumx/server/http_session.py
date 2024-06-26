@@ -29,7 +29,7 @@ class HttpHandler(object):
 
             data = {'height': utxo.height,
                     'address': bitcoin_address,
-                    'script_pub_Key': scriptPubKeyHex,
+                    'scriptPubKey': scriptPubKeyHex,
                     'txid': txid,
                     'vout': utxo.tx_pos,
                     'value': utxo.value}
