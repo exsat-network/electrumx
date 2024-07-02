@@ -25,3 +25,12 @@ Documentation
 
 See `readthedocs <https://electrumx-spesmilo.readthedocs.io/>`_.
 
+
+Run by Docker
+=============
+
+docker build -t electrumx:latest .
+
+
+docker run -d  --name electrumx-server   -p 50011:50011   -p 50021:50021   -p 8001:8001   -p 8081:8081   -e DAEMON_URL=http://exSat:exSat123@localhost:8332   -v /mnt2/electrumx_db:/electrumx_db --network host  electrumx
+
