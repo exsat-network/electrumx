@@ -61,6 +61,7 @@ class Daemon:
             max_workqueue=10,
             init_retry=0.25,
             max_retry=4.0,
+            max_height=0,
     ):
         self.coin = coin
         self.logger = class_logger(__name__, self.__class__.__name__)
@@ -78,6 +79,7 @@ class Daemon:
 
         self._networkinfo_cache = (None, 0)
         self._networkinfo_lock = asyncio.Lock()
+        self.max_height = max_height
 
     async def __aenter__(self):
         self.session = aiohttp.ClientSession(connector=self.connector())
@@ -312,7 +314,10 @@ class Daemon:
 
     async def height(self):
         '''Query the daemon for its current height.'''
-        self._height = await self._send_single('getblockcount')
+        blockcount = await self._send_single('getblockcount')
+        if 0 < self.max_height < blockcount:
+            blockcount = self.max_height
+        self._height = blockcount
         return self._height
 
     def cached_height(self):
