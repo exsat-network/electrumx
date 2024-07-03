@@ -118,6 +118,8 @@ class Prefetcher:
         '''
         daemon = self.daemon
         daemon_height = await daemon.height()
+        if daemon_height > self.end_block:
+            daemon_height = self.end_block
         async with self.semaphore:
             while self.cache_size < self.min_cache_size:
                 first = self.fetched_height + 1
