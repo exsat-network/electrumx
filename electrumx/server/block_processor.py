@@ -520,6 +520,7 @@ class BlockProcessor:
                               else is_unspendable_legacy)
             self.backup_txs(block.transactions, is_unspendable)
             self.height -= 1
+            self.logger.info(f'backed up to header_hash {header_hash} height {self.height:,d}')
             self.db.tx_counts.pop()
 
         self.logger.info(f'backed up to height {self.height:,d}')
