@@ -89,6 +89,9 @@ class Prefetcher:
         return blocks
 
     async def reset_height(self, height):
+        self.logger.info(
+            f'reset_height {height}'
+        )
         '''Reset to prefetch blocks from the block processor's height.
 
         Used in blockchain reorganisations.  This coroutine can be
@@ -292,6 +295,8 @@ class BlockProcessor:
         _start, last, hashes = await self.reorg_hashes(count)
         # Reverse and convert to hex strings.
         hashes = [hash_to_hex_str(hash) for hash in reversed(hashes)]
+        self.logger.info(f'hashes {hashes}')
+
         for hex_hashes in chunks(hashes, 50):
             raw_blocks = await get_raw_blocks(last, hex_hashes)
             await self.run_in_thread_with_lock(self.backup_blocks, raw_blocks)
