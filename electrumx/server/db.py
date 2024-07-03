@@ -45,7 +45,6 @@ class UTXO:
     pk_script: bytes  # publickey script (Add by exsat)
 
 
-
 @attr.s(slots=True)
 class FlushData:
     height = attr.ib()
@@ -768,7 +767,7 @@ class DB:
                 value, = unpack_le_uint64(db_value[:8])
                 tx_hash, height = self.fs_tx_hash(tx_num)
                 pk_script = db_value[8:]
-                utxos_append(UTXO(tx_num, txout_idx, tx_hash, height, value,pk_script))
+                utxos_append(UTXO(tx_num, txout_idx, tx_hash, height, value, pk_script))
             return utxos
 
         while True:
@@ -782,10 +781,13 @@ class DB:
     async def count_utxos(self):
         count = 0
         prefix = b'u'
+        values = 0
         iterator = self.utxo_db.iterator(prefix=prefix)
-        for db_key in iterator:
+        for db_key, db_value in iterator:
             count += 1
-        return count
+            value, = unpack_le_uint64(db_value[:8])
+            values += value
+        return count, values
 
     async def pageable_utxos(self, lastkey, limit):
         def read_utxos():
@@ -803,7 +805,7 @@ class DB:
                     value, = unpack_le_uint64(db_value[:8])
                     tx_hash, height = self.fs_tx_hash(tx_num)
                     pk_script = db_value[8:]
-                    utxos_append(UTXO(tx_num, txout_idx, tx_hash, height, value,pk_script))
+                    utxos_append(UTXO(tx_num, txout_idx, tx_hash, height, value, pk_script))
                     last_db_key = db_key.hex()
                     if len(utxos) == limit:
                         break
