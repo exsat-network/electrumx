@@ -1,6 +1,6 @@
 import struct
 from enum import IntEnum
-from typing import Optional, Callable, Union, Tuple, Sequence
+from typing import Optional, Callable, Union, Tuple, Sequence, Any
 
 from . import constants
 from . import segwit_addr
@@ -420,3 +420,199 @@ def get_address_from_output_script(_bytes: bytes, *, net=None) -> Optional[str]:
             return hash_to_segwit_addr(decoded[1][1], witver=witver, net=net)
 
     return None
+
+
+
+def is_segwit_address(addr: str, *, net=None) -> bool:
+    if net is None: net = constants.net
+    try:
+        witver, witprog = segwit_addr.decode_segwit_address(net.SEGWIT_HRP, addr)
+    except Exception as e:
+        return False
+    return witprog is not None
+
+def is_taproot_address(addr: str, *, net=None) -> bool:
+    if net is None: net = constants.net
+    try:
+        witver, witprog = segwit_addr.decode_segwit_address(net.SEGWIT_HRP, addr)
+    except Exception as e:
+        return False
+    return witver == 1
+
+def is_b58_address(addr: str, *, net=None) -> bool:
+    if net is None: net = constants.net
+    try:
+        # test length, checksum, encoding:
+        addrtype, h = b58_address_to_hash160(addr)
+    except Exception as e:
+        return False
+    if addrtype not in [net.ADDRTYPE_P2PKH, net.ADDRTYPE_P2SH]:
+        return False
+    return True
+
+
+def is_address(addr: str, *, net=None) -> bool:
+    return is_segwit_address(addr, net=net) \
+           or is_b58_address(addr, net=net)
+
+
+
+def _op_push(i: int) -> bytes:
+    if i < opcodes.OP_PUSHDATA1:
+        return int.to_bytes(i, length=1, byteorder="little", signed=False)
+    elif i <= 0xff:
+        return bytes([opcodes.OP_PUSHDATA1]) + int.to_bytes(i, length=1, byteorder="little", signed=False)
+    elif i <= 0xffff:
+        return bytes([opcodes.OP_PUSHDATA2]) + int.to_bytes(i, length=2, byteorder="little", signed=False)
+    else:
+        return bytes([opcodes.OP_PUSHDATA4]) + int.to_bytes(i, length=4, byteorder="little", signed=False)
+
+
+
+def push_script(data: bytes) -> bytes:
+    """Returns pushed data to the script, automatically
+    choosing canonical opcodes depending on the length of the data.
+
+    ported from https://github.com/btcsuite/btcd/blob/fdc2bc867bda6b351191b5872d2da8270df00d13/txscript/scriptbuilder.go#L128
+    """
+    data_len = len(data)
+
+    # "small integer" opcodes
+    if data_len == 0 or data_len == 1 and data[0] == 0:
+        return bytes([opcodes.OP_0])
+    elif data_len == 1 and data[0] <= 16:
+        return bytes([opcodes.OP_1 - 1 + data[0]])
+    elif data_len == 1 and data[0] == 0x81:
+        return bytes([opcodes.OP_1NEGATE])
+
+    return _op_push(data_len) + data
+
+
+def make_op_return(x: bytes) -> bytes:
+    return bytes([opcodes.OP_RETURN]) + push_script(x)
+
+
+
+def script_num_to_bytes(i: int) -> bytes:
+    """See CScriptNum in Bitcoin Core.
+    Encodes an integer as bytes, to be used in script.
+
+    ported from https://github.com/bitcoin/bitcoin/blob/8cbc5c4be4be22aca228074f087a374a7ec38be8/src/script/script.h#L326
+    """
+    if i == 0:
+        return b""
+
+    result = bytearray()
+    neg = i < 0
+    absvalue = abs(i)
+    while absvalue > 0:
+        result.append(absvalue & 0xff)
+        absvalue >>= 8
+
+    if result[-1] & 0x80:
+        result.append(0x80 if neg else 0x00)
+    elif neg:
+        result[-1] |= 0x80
+
+    return bytes(result)
+
+
+
+def add_number_to_script(i: int) -> bytes:
+    return push_script(script_num_to_bytes(i))
+
+
+def is_hex_str(text: Any) -> bool:
+    if not isinstance(text, str): return False
+    try:
+        b = bytes.fromhex(text)
+    except Exception:
+        return False
+    # forbid whitespaces in text:
+    if len(text) != 2 * len(b):
+        return False
+    return True
+
+bfh = bytes.fromhex
+
+
+def construct_script(items: Sequence[Union[str, int, bytes, opcodes]], values=None) -> bytes:
+    """Constructs bitcoin script from given items."""
+    script = bytearray()
+    values = values or {}
+    for i, item in enumerate(items):
+        if i in values:
+            item = values[i]
+        if isinstance(item, opcodes):
+            script += bytes([item])
+        elif type(item) is int:
+            script += add_number_to_script(item)
+        elif isinstance(item, (bytes, bytearray)):
+            script += push_script(item)
+        elif isinstance(item, str):
+            assert is_hex_str(item)
+            script += push_script(bfh(item))
+        else:
+            raise Exception(f'unexpected item for script: {item!r}')
+    return bytes(script)
+
+
+
+def pubkeyhash_to_p2pkh_script(pubkey_hash160: bytes) -> bytes:
+    return construct_script([
+        opcodes.OP_DUP,
+        opcodes.OP_HASH160,
+        pubkey_hash160,
+        opcodes.OP_EQUALVERIFY,
+        opcodes.OP_CHECKSIG
+    ])
+
+def address_to_script(addr: str, *, net=None) -> bytes:
+    if net is None: net = constants.net
+    if not is_address(addr, net=net):
+        raise BitcoinException(f"invalid bitcoin address: {addr}")
+    witver, witprog = segwit_addr.decode_segwit_address(net.SEGWIT_HRP, addr)
+    if witprog is not None:
+        if not (0 <= witver <= 16):
+            raise BitcoinException(f'impossible witness version: {witver}')
+        return construct_script([witver, bytes(witprog)])
+    addrtype, hash_160_ = b58_address_to_hash160(addr)
+    if addrtype == net.ADDRTYPE_P2PKH:
+        script = pubkeyhash_to_p2pkh_script(hash_160_)
+    elif addrtype == net.ADDRTYPE_P2SH:
+        script = construct_script([opcodes.OP_HASH160, hash_160_, opcodes.OP_EQUAL])
+    else:
+        raise BitcoinException(f'unknown address type: {addrtype}')
+    return script
+
+
+def get_address_from_output_script(_bytes: bytes, *, net=None) -> Optional[str]:
+    try:
+        decoded = [x for x in script_GetOp(_bytes)]
+    except MalformedBitcoinScript:
+        return None
+
+    # p2pkh
+    if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2PKH):
+        return hash160_to_p2pkh(decoded[2][1], net=net)
+
+    # p2sh
+    if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2SH):
+        return hash160_to_p2sh(decoded[1][1], net=net)
+
+    # segwit address (version 0)
+    if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_WITNESS_V0):
+        return hash_to_segwit_addr(decoded[1][1], witver=0, net=net)
+
+    # segwit address (version 1-16)
+    future_witness_versions = list(range(opcodes.OP_1, opcodes.OP_16 + 1))
+    for witver, opcode in enumerate(future_witness_versions, start=1):
+        match = [opcode, OPPushDataGeneric(lambda x: 2 <= x <= 40)]
+        if match_script_against_template(decoded, match):
+            return hash_to_segwit_addr(decoded[1][1], witver=witver, net=net)
+
+    return None
+
+
+def script_to_address(script: bytes, *, net=None) -> Optional[str]:
+    return get_address_from_output_script(script, net=net)
