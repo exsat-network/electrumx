@@ -4,7 +4,7 @@
 #
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
+import time
 from asyncio import Event
 
 from aiorpcx import _version as aiorpcx_version
@@ -98,7 +98,7 @@ class Controller(ServerBase):
         Daemon = env.coin.DAEMON
         BlockProcessor = env.coin.BLOCK_PROCESSOR
 
-        async with Daemon(env.coin, env.daemon_url) as daemon:
+        async with Daemon(env.coin, env.daemon_url, max_height=env.end_block) as daemon:
             db = DB(env)
             bp = BlockProcessor(env, db, daemon, notifications)
 
@@ -133,6 +133,8 @@ class Controller(ServerBase):
                 if env.end_block == 0:
                     await group.spawn(mempool.keep_synchronized(mempool_event))
                 else:
+                    import time
+                    time.sleep(5)
                     mempool_event.set()
 
             async with OldTaskGroup() as group:

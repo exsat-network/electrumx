@@ -15,6 +15,7 @@ import sys
 
 from electrumx import Controller, Env
 from electrumx.lib.util import CompactFormatter, make_logger
+from electrumx.script.constants import set_network
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -30,6 +31,7 @@ def main():
         if sys.version_info < (3, 8):
             raise RuntimeError('ElectrumX requires Python 3.8 or greater')
         env = Env()
+        set_network(env.coin.NET)
         logger.info(f'logging level: {env.log_level}')
         logger.setLevel(env.log_level)
         controller = Controller(env)

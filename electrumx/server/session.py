@@ -848,6 +848,7 @@ class SessionManager:
         '''Notify sessions about height changes and touched addresses.'''
         height_changed = height != self.notified_height
         if height_changed:
+            self.logger.warning(f"height_changed height={height} notified_height={self.notified_height}")
             await self._refresh_hsub_results(height)
             # Invalidate our history cache for touched hashXs
             cache = self._history_cache

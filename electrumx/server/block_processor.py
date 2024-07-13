@@ -89,6 +89,9 @@ class Prefetcher:
         return blocks
 
     async def reset_height(self, height):
+        self.logger.info(
+            f'reset_height {height}'
+        )
         '''Reset to prefetch blocks from the block processor's height.
 
         Used in blockchain reorganisations.  This coroutine can be
@@ -116,13 +119,10 @@ class Prefetcher:
 
         Repeats until the queue is full or caught up.
         '''
-        if 0 < self.end_block <= self.fetched_height:
-            self.logger.info(f'Arrive at the end block, stop synchronization '
-                             f'end_block: {self.end_block} '
-                             f'fetched_height: {self.fetched_height}')
-            return
         daemon = self.daemon
         daemon_height = await daemon.height()
+        if daemon_height > self.end_block:
+            daemon_height = self.end_block
         async with self.semaphore:
             while self.cache_size < self.min_cache_size:
                 first = self.fetched_height + 1
@@ -295,6 +295,8 @@ class BlockProcessor:
         _start, last, hashes = await self.reorg_hashes(count)
         # Reverse and convert to hex strings.
         hashes = [hash_to_hex_str(hash) for hash in reversed(hashes)]
+        self.logger.info(f'hashes {hashes}')
+
         for hex_hashes in chunks(hashes, 50):
             raw_blocks = await get_raw_blocks(last, hex_hashes)
             await self.run_in_thread_with_lock(self.backup_blocks, raw_blocks)
@@ -478,8 +480,9 @@ class BlockProcessor:
                 # Get the hashX
                 hashX = script_hashX(txout.pk_script)
                 append_hashX(hashX)
+                # Add txout.pk_script by exsat
                 put_utxo(tx_hash + to_le_uint32(idx),
-                         hashX + tx_numb + to_le_uint64(txout.value))
+                         hashX + tx_numb + to_le_uint64(txout.value) + txout.pk_script)
 
             append_hashXs(hashXs)
             update_touched(hashXs)
@@ -517,6 +520,7 @@ class BlockProcessor:
                               else is_unspendable_legacy)
             self.backup_txs(block.transactions, is_unspendable)
             self.height -= 1
+            self.logger.info(f'backed up to header_hash {header_hash} height {self.height:,d}')
             self.db.tx_counts.pop()
 
         self.logger.info(f'backed up to height {self.height:,d}')
@@ -667,14 +671,6 @@ class BlockProcessor:
     async def _process_prefetched_blocks(self):
         '''Loop forever processing blocks as they arrive.'''
         while True:
-            # add by exsat, stop fetch blocks
-            if 0 < self.env.end_block <= self.height:
-                self.logger.info(f'Arrive at the end block, stop synchronization '
-                                 f'end_block: {self.env.end_block} '
-                                 f'current_block: {self.height}')
-                self._caught_up_event.set()
-                break
-
             if self.height == self.daemon.cached_height():
                 if not self._caught_up_event.is_set():
                     await self._first_caught_up()

@@ -2,7 +2,8 @@
 
 from aiohttp import web
 import electrumx.lib.util as util
-from electrumx.lib.hash import hash_to_hex_str
+from electrumx.lib.hash import hash_to_hex_str, Base58
+from electrumx.script.script import get_address_from_output_script
 
 
 class HttpHandler(object):
@@ -20,28 +21,15 @@ class HttpHandler(object):
         limit = int(limit)
         last_db_key, utxos = await self.db.pageable_utxos(startkey, limit)
         data_list = []
-        txids = {hash_to_hex_str(utxo.tx_hash) for utxo in utxos}
-
-        output_addr = {}
-        for txid in txids:
-            tx = await self.daemon.getrawtransaction(txid, True)
-            vout = tx['vout']
-            for idx in range(len(vout)):
-                output = "%s:%d" % (txid, idx)
-                output_addr[output] = vout[idx]['scriptPubKey']
 
         for utxo in utxos:
             txid = hash_to_hex_str(utxo.tx_hash)
-            output = "%s:%d" % (txid, utxo.tx_pos)
+            scriptPubKeyHex = utxo.pk_script.hex()
+            bitcoin_address = get_address_from_output_script(utxo.pk_script)
 
-            if 'address' in output_addr[output]:
-                address = output_addr[output]['address']
-            else:
-                address = 'nostandard'
-            hex = output_addr[output]['hex']
             data = {'height': utxo.height,
-                    'address': address,
-                    'scriptPubKeyHex': hex,
+                    'address': bitcoin_address,
+                    'scriptPubKey': scriptPubKeyHex,
                     'txid': txid,
                     'vout': utxo.tx_pos,
                     'value': utxo.value}
